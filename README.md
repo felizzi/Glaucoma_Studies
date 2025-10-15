@@ -21,7 +21,7 @@ This model simulates the progression of glaucoma through four disease states (Mi
 - **Multiple Scenarios**: General population and diabetic retinopathy screening
 
 ## 🏥 Model Structure
-0
+
 ### Disease States
 - **Mild Glaucoma** - Early stage with minimal vision loss
 - **Moderate Glaucoma** - Progressive vision field defects
