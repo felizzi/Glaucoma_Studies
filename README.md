@@ -42,10 +42,10 @@ The model incorporates different progression rates based on screening strategy:
 ### Annual Costs (USD)
 | State | Monitoring | Treatment | Productivity Loss |
 |-------|------------|-----------|-------------------|
-| Mild | $352 | $303 | $0 |
-| Moderate | $463 | $429 | $0 |
-| Severe | $644 | $609 | $0 |
-| VI | $576 | $662 | $7,630 |
+| Mild | €352 | €303 | €0 |
+| Moderate | €463 | €429 | €0 |
+| Severe | €644 | €609 | €0 |
+| VI | €576 | €662 | €7,630 |
 
 ### Screening Costs
 - **AI Screening**: $11.50 per patient
