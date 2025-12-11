@@ -1,32 +1,16 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-
 def calculate_icer_with_time_horizon(ai_results, nonai_results, time_horizon=None, discounted=True, icer_limits=(-500000, 500000)):
     """
     Calculate ICER with flexible time horizon
-
-    Parameters:
-    - ai_results: Results from AI model run_probabilistic(return_traces=True)
-    - nonai_results: Results from Non-AI model run_probabilistic(return_traces=True)
-    - time_horizon: Years to include (None = all years)
-    - discounted: Use discounted values
-
-    Returns:
-    - Dictionary with ICER results for specified time horizon
     """
-
+    print(">>> USING NEW VERSION WITH LOOP <<<")
+    
     # Extract trace tensors
-    ai_traces = ai_results['trace_tensor']
-    nonai_traces = nonai_results['trace_tensor']
+    ai_traces = ai_results['trace_tensor'].copy()
+    nonai_traces = nonai_results['trace_tensor'].copy()
     variable_names = ai_results['trace_variable_names']
-
-     # ADD THIS CHECK
-    print(f"\n=== CHECKING IF TRACES ARE IDENTICAL ===")
-    print(f"ai_traces is ai_results['trace_tensor']: {ai_traces is ai_results['trace_tensor']}")
-    print(f"First element AI: {ai_traces[0,0,0]:.4f}")
-    print(f"First element nonAI: {nonai_traces[0,0,0]:.4f}")
-    print(f"Are they the same object? {ai_traces is nonai_traces}")
 
     # Get cost and QALY variable indices
     if discounted:
@@ -46,7 +30,7 @@ def calculate_icer_with_time_horizon(ai_results, nonai_results, time_horizon=Non
     else:
         years_to_include = min(time_horizon + 1, max_years)
 
-    # Calculate total costs and QALYs for each simulation up to time horizon
+    # Calculate total costs and QALYs
     n_iterations = ai_traces.shape[0]
 
     ai_total_costs = np.sum(ai_traces[:, :years_to_include, cost_idx], axis=1)
@@ -55,72 +39,56 @@ def calculate_icer_with_time_horizon(ai_results, nonai_results, time_horizon=Non
     nonai_total_costs = np.sum(nonai_traces[:, :years_to_include, cost_idx], axis=1)
     nonai_total_qalys = np.sum(nonai_traces[:, :years_to_include, qaly_idx], axis=1)
 
-    # ADD THESE DIAGNOSTICS
-    print(f"\n=== DETAILED DIAGNOSTICS (time_horizon={time_horizon}) ===")
-    print(f"Cost index: {cost_idx}, QALY index: {qaly_idx}")
-    print(f"Years included: {years_to_include}")
-    print(f"AI costs - first 5 sims: {ai_total_costs[:5]}")
-    print(f"NonAI costs - first 5 sims: {nonai_total_costs[:5]}")
-    print(f"AI QALYs - first 5 sims: {ai_total_qalys[:5]}")
-    print(f"NonAI QALYs - first 5 sims: {nonai_total_qalys[:5]}")
-    print(f"Unique AI costs: {len(np.unique(ai_total_costs))}")
-    print(f"Unique NonAI costs: {len(np.unique(nonai_total_costs))}")
-    
     # Calculate incremental values
-    incremental_costs = ai_total_costs - nonai_total_costs
-    incremental_qalys = ai_total_qalys - nonai_total_qalys
+    incremental_costs = np.array(ai_total_costs - nonai_total_costs)
+    incremental_qalys = np.array(ai_total_qalys - nonai_total_qalys)
+
+    # Calculate ICER
+    icers = np.zeros(len(incremental_costs))
+    for i in range(len(incremental_costs)):
+        if incremental_qalys[i] != 0:
+            icers[i] = incremental_costs[i] / incremental_qalys[i]
+        else:
+            icers[i] = np.inf
     
-    print(f"Incremental costs - first 5: {incremental_costs[:5]}")
-    print(f"Incremental QALYs - first 5: {incremental_qalys[:5]}")
+    # Create combined filter
+    finite_mask = np.isfinite(icers)
+    limits_mask = (icers >= icer_limits[0]) & (icers <= icer_limits[1])
+    combined_mask = finite_mask & limits_mask
+    
+    # Apply mask
+    incremental_costs_filtered = incremental_costs[combined_mask]
+    incremental_qalys_filtered = incremental_qalys[combined_mask]
+    icers_filtered = icers[combined_mask]
+    
+    print(f"Number of ICERs after filtering: {len(icers_filtered)} out of {n_iterations}")
+    print(f"Mean ICER: {np.mean(icers_filtered):.2f}")
 
-    # Calculate ICER for each simulation
-    icers = np.where(incremental_qalys != 0,
-                     incremental_costs / incremental_qalys,
-                     np.inf)
-
-    # Remove infinite values for statistical calculations
-    finite_icers = icers[np.isfinite(icers)]
-    ## print the number of finite ICERS
-    print(f"Number of finite ICERS: {len(finite_icers)}")
-    mask_filtered_icers = mask = (finite_icers >= icer_limits[0]) & (finite_icers <= icer_limits[1])
-    incremental_costs = incremental_costs[mask_filtered_icers]
-    incremental_qalys = incremental_qalys[mask_filtered_icers]
-    finite_icers = finite_icers[mask_filtered_icers]
-
-
-
+    # THE RETURN MUST BE THE LAST THING IN THE FUNCTION
     return {
         'time_horizon': time_horizon if time_horizon is not None else max_years - 1,
         'years_included': years_to_include - 1,
         'n_simulations': n_iterations,
         'discounted': discounted,
-
-        # Incremental costs
-        'incremental_costs': incremental_costs,
-        'incremental_costs_mean': np.mean(incremental_costs),
-        'incremental_costs_std': np.std(incremental_costs),
-        'incremental_costs_median': np.median(incremental_costs),
-
-        # Incremental QALYs
-        'incremental_qalys': incremental_qalys,
-        'incremental_qalys_mean': np.mean(incremental_qalys),
-        'incremental_qalys_std': np.std(incremental_qalys),
-        'incremental_qalys_median': np.median(incremental_qalys),
-
-        # ICER statistics
+        'incremental_costs': incremental_costs_filtered,
+        'incremental_costs_mean': np.mean(incremental_costs_filtered),
+        'incremental_costs_std': np.std(incremental_costs_filtered),
+        'incremental_costs_median': np.median(incremental_costs_filtered),
+        'incremental_qalys': incremental_qalys_filtered,
+        'incremental_qalys_mean': np.mean(incremental_qalys_filtered),
+        'incremental_qalys_std': np.std(incremental_qalys_filtered),
+        'incremental_qalys_median': np.median(incremental_qalys_filtered),
         'icers': icers,
-        'finite_icers': finite_icers,
-        'icer_mean': np.mean(finite_icers) if len(finite_icers) > 0 else np.inf,
-        'icer_median': np.median(finite_icers) if len(finite_icers) > 0 else np.inf,
-
-        # Base case values
+        'finite_icers': icers_filtered,
+        'icer_mean': np.mean(icers_filtered) if len(icers_filtered) > 0 else np.inf,
+        'icer_median': np.median(icers_filtered) if len(icers_filtered) > 0 else np.inf,
         'ai_mean_cost': np.mean(ai_total_costs),
         'ai_mean_qalys': np.mean(ai_total_qalys),
         'nonai_mean_cost': np.mean(nonai_total_costs),
         'nonai_mean_qalys': np.mean(nonai_total_qalys),
     }
-
-
+    
+    # ... rest of the function ...
 def calculate_icer_confidence_intervals(icer_results, confidence_level=0.95):
     """
     Calculate confidence intervals for ICER using bootstrap or percentile method
@@ -309,6 +277,7 @@ def create_summary_table(comprehensive_results):
             'Incremental_Cost_95CI': f"[€{summary['incremental_cost_ci'][0]:,.0f}, €{summary['incremental_cost_ci'][1]:,.0f}]",
             'Incremental_QALY_Mean': f"{summary['incremental_qaly_mean']:.3f}",
             'Incremental_QALY_95CI': f"[{summary['incremental_qaly_ci'][0]:.3f}, {summary['incremental_qaly_ci'][1]:.3f}]",
+            'ICER': f"€{summary['incremental_cost_mean'] / summary['incremental_qaly_mean']:,.0f}" if summary['incremental_qaly_mean'] != 0 else "N/A",
             'ICER_Mean': f"€{summary['icer_mean']:,.0f}" if np.isfinite(summary['icer_mean']) else "Dominated/Dominates",
             'ICER_Median': f"€{summary['icer_median']:,.0f}" if np.isfinite(summary['icer_median']) else "Dominated/Dominates",
             'ICER_95CI': f"[€{summary['icer_ci'][0]:,.0f}, €{summary['icer_ci'][1]:,.0f}]" if np.isfinite(summary['icer_ci'][0]) else "N/A",
