@@ -20,6 +20,24 @@ This model simulates the progression of glaucoma through four disease states (Mi
 - **Comprehensive Economic Evaluation**: Year-by-year breakdown of costs and QALYs
 - **Multiple Scenarios**: General population and diabetic retinopathy screening
 
+## 📁 Repository Structure
+
+The analysis is organized into a series of Jupyter notebooks that build upon each other:
+
+### Core Model
+1. **01_model_setup_restructured.ipynb** - Initial model setup, defining the Markov structure, transition probabilities, costs, and utilities for both AI and non-AI screening strategies
+
+### Sensitivity Analyses
+2. **02_prevalence_sensitivity_rerun.ipynb** - Analysis of how varying glaucoma prevalence rates affect model outcomes and cost-effectiveness
+3. **03_productivity_sensitivity_analysis.ipynb** - Evaluation of productivity loss impacts across different disease states
+4. **04_starting_age_sensitivity_analysis.ipynb** - Assessment of optimal screening start age and age-specific considerations
+5. **05_ai_cost_sensitivity_analysis.ipynb** - Testing robustness to variations in AI screening costs
+6. **06_fp_disutility_sensitivity_analysis.ipynb** - Analysis of false positive rates and associated quality of life impacts
+7. **07_screening_frequency_sensitivity_analysis.ipynb** - Comparison of different screening interval strategies
+
+### Recommended Workflow
+Start with notebook 01 to understand the base model, then proceed through the sensitivity analyses (02-07) to explore parameter uncertainty and model robustness.
+
 ## 🏥 Model Structure
 
 ### Disease States
