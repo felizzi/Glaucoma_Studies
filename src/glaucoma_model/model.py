@@ -66,7 +66,7 @@ class BaseGlaucomaModel:
         mortality_dict = dict(zip(df[age_col], df[qx_col]))
         self.mortality_table = mortality_dict
         return mortality_dict
-
+    
     def get_age_specific_mortality(self, age, sample):
         """
         Get age-specific mortality rate q(x) from mortality table
@@ -94,28 +94,66 @@ class BaseGlaucomaModel:
             else:
                 base_qx = self.mortality_table[max(self.mortality_table.keys())]
         
-        # Optional: Apply uncertainty/variation to mortality rates in PSA
-        # mortality_adjustment = sample.get('mortality_adjustment_factor', 1.0)
-        # base_qx = base_qx * mortality_adjustment
-        
         return np.clip(base_qx, 0, 1)
 
-    def get_state_specific_mortality_multiplier(self, state, sample):
+    def adjust_mortality_with_odds_ratio(self, base_qx, odds_ratio):
         """
-        Get mortality multiplier for each health state (hazard ratio vs general population)
-        These represent excess mortality risk due to glaucoma severity
+        Adjust mortality probability given an odds ratio
+        
+        Parameters:
+        -----------
+        base_qx : float
+            Base mortality probability
+        odds_ratio : float
+            Odds ratio for mortality risk
+        
+        Returns:
+        --------
+        float : Adjusted mortality probability
         """
-        multipliers = {
-            'Mild': sample.get('mortality_multiplier_mild', 1.0), ## modify the mortality multipliers as needed
-            'Moderate': sample.get('mortality_multiplier_moderate', 1.05),
-            'Severe': sample.get('mortality_multiplier_severe', 1.10),
-            'VI': sample.get('mortality_multiplier_vi', 1.20),
-            'Dead': 0.0
+        adjusted_qx = (odds_ratio * base_qx) / (1 - base_qx + odds_ratio * base_qx)
+        return np.clip(adjusted_qx, 0, 1)
+
+    def get_state_specific_mortality(self, state, base_qx, sample):
+        """
+        Get state-specific mortality rate adjusted by odds ratio
+        Uses the mortality_or parameters from GlaucomaParameters class
+        
+        Parameters:
+        -----------
+        state : str
+            Health state ('Mild', 'Moderate', 'Severe', 'VI')
+        base_qx : float
+            Base mortality probability from life table
+        sample : dict
+            Dictionary of sampled parameters (includes mortality_or_mild, etc.)
+        
+        Returns:
+        --------
+        float : State-specific adjusted mortality probability
+        """
+        # Map state names to odds ratio parameters (these come from sample_all())
+        or_map = {
+            'Mild': 'mortality_or_mild',
+            'Moderate': 'mortality_or_moderate',
+            'Severe': 'mortality_or_severe',
+            'VI': 'mortality_or_vi',
+            'Dead': None
         }
-        return multipliers.get(state, 1.0)
+        
+        if state == 'Dead':
+            return 0.0
+        
+        or_param_name = or_map.get(state)
+        if or_param_name and or_param_name in sample:
+            odds_ratio = sample[or_param_name]
+            return self.adjust_mortality_with_odds_ratio(base_qx, odds_ratio)
+        else:
+            # If no odds ratio available, return base mortality
+            return base_qx
 
     def get_transition_matrix(self, sample, age):
-        """Build transition matrix from sampled parameters including age-specific mortality"""
+        """Build transition matrix from sampled parameters including age-specific mortality with odds ratios"""
         p1 = sample['mild_to_moderate']
         p2 = sample['moderate_to_severe']
         p3 = sample['severe_to_vi']
@@ -124,11 +162,11 @@ class BaseGlaucomaModel:
         # Get age-specific base mortality q(x) from mortality table
         base_qx = self.get_age_specific_mortality(age, sample)
         
-        # Apply state-specific mortality multipliers (hazard ratios)
-        mort_mild = base_qx * self.get_state_specific_mortality_multiplier('Mild', sample)
-        mort_moderate = base_qx * self.get_state_specific_mortality_multiplier('Moderate', sample)
-        mort_severe = base_qx * self.get_state_specific_mortality_multiplier('Severe', sample)
-        mort_vi = base_qx * self.get_state_specific_mortality_multiplier('VI', sample)
+        # Apply state-specific mortality using odds ratios from GlaucomaParameters
+        mort_mild = self.get_state_specific_mortality('Mild', base_qx, sample)
+        mort_moderate = self.get_state_specific_mortality('Moderate', base_qx, sample)
+        mort_severe = self.get_state_specific_mortality('Severe', base_qx, sample)
+        mort_vi = self.get_state_specific_mortality('VI', base_qx, sample)
         
         # Clip mortality rates to valid range [0, 1]
         mort_mild, mort_moderate, mort_severe, mort_vi = np.clip(
@@ -154,6 +192,8 @@ class BaseGlaucomaModel:
             # From Dead: stay dead
             [0, 0, 0, 0, 1]
         ])
+
+
 
     def simulate_cohort(self, initial_dist, years, sample):
         """Simulate cohort over time with age-dependent mortality"""
@@ -318,7 +358,8 @@ class AIGlaucomaModel(BaseGlaucomaModel):
         for category in [self.params.costs, self.params.utilities, self.params.transitions,
                         self.params.screening_accuracy, self.params.screening_accuracy_mild,
                         self.params.screening_accuracy_moderate, self.params.screening_accuracy_severe,
-                        self.params.screening_params, self.params.discount_rates]:
+                        self.params.screening_params, self.params.discount_rates,
+                        self.params.mortality_odds_ratios]:
             for name, param in category.items():
                 sample[name] = param.mean
 
@@ -514,7 +555,8 @@ class NonAIGlaucomaModel(BaseGlaucomaModel):
         for category in [self.params.costs, self.params.utilities, self.params.transitions,
                         self.params.screening_accuracy, self.params.screening_accuracy_mild,
                         self.params.screening_accuracy_moderate, self.params.screening_accuracy_severe,
-                        self.params.screening_params, self.params.discount_rates]:
+                        self.params.screening_params, self.params.discount_rates, 
+                        self.params.mortality_odds_ratios]:
             for name, param in category.items():
                 sample[name] = param.mean
 
@@ -561,7 +603,7 @@ class NonAIGlaucomaModel(BaseGlaucomaModel):
             self.starting_age = starting_age
             
         if initial_dist is None:
-            initial_dist = [1, 0, 0, 0, 0]  # All start in Mild, none dead
+            initial_dist = [1, 0, 0, 0, 0]  # All start in Mild, none dead - to be adjusted as needed
 
         np.random.seed(random_seed)
 

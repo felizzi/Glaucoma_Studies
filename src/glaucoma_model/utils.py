@@ -100,11 +100,11 @@ def create_prevalence_scenario(base_results, model_params, prevalence_value, var
     idx2 = variable_names.index('Total_Cost_Disc')
     
     # Get parameters
-    ai_screening_cost = model_params['costs']['ai_screening']['mean']
+    ai_screening_cost = model_params['costs']['ai_screening'].mean
     print("ai screening cost ",ai_screening_cost )
-    human_screening_cost = model_params['costs']['human_screening']['mean']
+    human_screening_cost = model_params['costs']['human_screening'].mean
     print("human costs", human_screening_cost)
-    specificity = model_params['screening_accuracy']['specificity']['mean']
+    specificity = model_params['screening_accuracy']['specificity'].mean
     
     # ORIGINAL scenario costs
     # AI screening: number of people to screen × cost per person
@@ -196,6 +196,7 @@ def summarize_prevalence_sensitivity(sensitivity_results, time_horizon='10_years
                 'Prevalence_Value': prev,
                 'Incremental_Cost': summary['incremental_cost_mean'],
                 'Incremental_QALY': summary['incremental_qaly_mean'],
+                'ICER': summary['incremental_cost_mean'] / summary['incremental_qaly_mean'] if summary['incremental_qaly_mean'] != 0 else np.nan,
                 'ICER_Mean': summary['icer_mean'],
                 'ICER_Median': summary['icer_median'],
                 'Prob_CE_20k': summary['prob_cost_effective_20k'],
@@ -246,3 +247,69 @@ def load_scenario_results(scenario_name, output_dir='../../data/scenarios'):
     
     print(f"Scenario results loaded from {filepath}")
     return scenario_results
+
+def create_mixed_scenarios(ai_results, non_ai_results, variable_names, mix_ratio_1=0.5, mix_ratio_2=0.5):
+    """
+    Create two mixed scenarios from AI and non-AI base scenarios
+    """
+    # Create deep copies
+    mixed_scenario_1 = copy.deepcopy(ai_results)
+    mixed_scenario_2 = copy.deepcopy(ai_results)
+    
+    # Extract trace arrays
+    ai_traces = ai_results['trace_tensor']
+    non_ai_traces = non_ai_results['trace_tensor']
+    
+    # Define variables to adjust
+    cost_variables = ['Total_Cost', 'Total_Cost_Disc']
+    qaly_variables = ['Total_QALY', 'Total_QALY_Disc',
+                      'QALY_Mild', 'QALY_Moderate', 'QALY_Severe', 'QALY_VI']
+    
+    variables_to_adjust = cost_variables + qaly_variables
+    indices = [variable_names.index(var) for var in variables_to_adjust]
+    
+    # Create new trace tensors
+    mixed_traces_1 = np.copy(ai_traces)
+    mixed_traces_2 = np.copy(ai_traces)
+    
+    # Mix the variables
+    for idx in indices:
+        mixed_traces_1[:, :, idx] = (
+            mix_ratio_1 * ai_traces[:, :, idx] + 
+            (1 - mix_ratio_1) * non_ai_traces[:, :, idx]
+        )
+        mixed_traces_2[:, :, idx] = (
+            mix_ratio_2 * ai_traces[:, :, idx] + 
+            (1 - mix_ratio_2) * non_ai_traces[:, :, idx]
+        )
+    
+    # Update
+    mixed_scenario_1['trace_tensor'] = mixed_traces_1
+    mixed_scenario_2['trace_tensor'] = mixed_traces_2
+    
+    # DIAGNOSTIC PRINTS
+    cost_idx = variable_names.index('Total_Cost_Disc')
+    qaly_idx = variable_names.index('Total_QALY_Disc')
+    
+    print(f"\n=== DIAGNOSTIC: Scenario Creation ===")
+    print(f"Mix ratios: {mix_ratio_1} vs {mix_ratio_2}")
+    print(f"\nFirst simulation, all years, Total_Cost_Disc:")
+    print(f"  AI sum: {np.sum(ai_traces[0, :, cost_idx]):.2f}")
+    print(f"  Non-AI sum: {np.sum(non_ai_traces[0, :, cost_idx]):.2f}")
+    print(f"  Mixed 1 sum: {np.sum(mixed_traces_1[0, :, cost_idx]):.2f}")
+    print(f"  Mixed 2 sum: {np.sum(mixed_traces_2[0, :, cost_idx]):.2f}")
+    
+    print(f"\nFirst simulation, all years, Total_QALY_Disc:")
+    print(f"  AI sum: {np.sum(ai_traces[0, :, qaly_idx]):.3f}")
+    print(f"  Non-AI sum: {np.sum(non_ai_traces[0, :, qaly_idx]):.3f}")
+    print(f"  Mixed 1 sum: {np.sum(mixed_traces_1[0, :, qaly_idx]):.3f}")
+    print(f"  Mixed 2 sum: {np.sum(mixed_traces_2[0, :, qaly_idx]):.3f}")
+    
+    # Check if scenarios are actually different
+    cost_diff = np.sum(mixed_traces_1[:, :, cost_idx]) - np.sum(mixed_traces_2[:, :, cost_idx])
+    qaly_diff = np.sum(mixed_traces_1[:, :, qaly_idx]) - np.sum(mixed_traces_2[:, :, qaly_idx])
+    print(f"\nDifference between mixed scenarios (all sims):")
+    print(f"  Total cost difference: {cost_diff:.2f}")
+    print(f"  Total QALY difference: {qaly_diff:.3f}")
+    
+    return mixed_scenario_1, mixed_scenario_2

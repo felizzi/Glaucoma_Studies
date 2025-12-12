@@ -26,11 +26,16 @@ class Parameter:
             alpha = self.mean * (self.mean * (1 - self.mean) / self.std**2 - 1)
             beta = (1 - self.mean) * (self.mean * (1 - self.mean) / self.std**2 - 1)
             return np.random.beta(max(alpha, 0.1), max(beta, 0.1), n)
+        elif self.dist_type == 'lognormal':
+            # Convert mean and std to lognormal parameters
+            variance = self.std ** 2
+            mu = np.log(self.mean ** 2 / np.sqrt(variance + self.mean ** 2))
+            sigma = np.sqrt(np.log(1 + variance / self.mean ** 2))
+            return np.random.lognormal(mu, sigma, n)
         else:  # normal
             return np.maximum(0, np.random.normal(self.mean, self.std, n))
 
 print("Parameter class defined!") 
-
 class GlaucomaParameters:
     """All model parameters in one place"""
 
@@ -60,10 +65,16 @@ class GlaucomaParameters:
                  detection_proportion=1.0, detection_std=0.000001,
                  prevalence_general=0.05, prevalence_general_std=0.005,
                  prevalence_dr=0.07, prevalence_dr_std=0.01,
-                 screening_cost=10, screening_cost_std=0.01,
                  # Separate screening costs
                  ai_screening_cost=30, ai_screening_cost_std=5,
-                 human_screening_cost=75, human_screening_cost_std=15):
+                 human_screening_cost=75, human_screening_cost_std=15,
+                 # Mortality odds ratios
+                 mortality_or_mild=1.8, mortality_or_mild_std=0.1,
+                 mortality_or_moderate=1.8, mortality_or_moderate_std=0.1,
+                 mortality_or_severe=1.8, mortality_or_severe_std=0.1,
+                 mortality_or_vi=3.9, mortality_or_vi_std=0.1,
+                 # False positive disutility
+                 disutility_false_positive=0.02, disutility_fp_std=0.005):
 
         self.scenario_name = scenario_name
 
@@ -85,7 +96,6 @@ class GlaucomaParameters:
             'productivity_moderate': Parameter(0, 0, 'gamma'),
             'productivity_severe': Parameter(0, 0, 'gamma'),
             'productivity_vi': Parameter(7630, 0.2*7630, 'gamma'),
-            'screening': Parameter(screening_cost, screening_cost_std, 'gamma'),
             'ai_screening': Parameter(ai_screening_cost, ai_screening_cost_std, 'gamma'),
             'human_screening': Parameter(human_screening_cost, human_screening_cost_std, 'gamma'),
         }
@@ -96,6 +106,7 @@ class GlaucomaParameters:
             'utility_moderate': Parameter(0.899, 0.039, 'beta'),
             'utility_severe': Parameter(0.773, 0.046, 'beta'),
             'utility_vi': Parameter(0.634, 0.052, 'beta'),
+            'disutility_false_positive': Parameter(disutility_false_positive, disutility_fp_std, 'beta'),
         }
 
         # TRANSITION PROBABILITIES
@@ -103,6 +114,14 @@ class GlaucomaParameters:
             'mild_to_moderate': Parameter(mild_to_moderate_mean, mild_to_moderate_std, 'beta'),
             'moderate_to_severe': Parameter(moderate_to_severe_mean, moderate_to_severe_std, 'beta'),
             'severe_to_vi': Parameter(severe_to_vi_mean, severe_to_vi_std, 'beta'),
+        }
+
+        # MORTALITY ODDS RATIOS
+        self.mortality_odds_ratios = {
+            'mortality_or_mild': Parameter(mortality_or_mild, mortality_or_mild_std, 'lognormal'),
+            'mortality_or_moderate': Parameter(mortality_or_moderate, mortality_or_moderate_std, 'lognormal'),
+            'mortality_or_severe': Parameter(mortality_or_severe, mortality_or_severe_std, 'lognormal'),
+            'mortality_or_vi': Parameter(mortality_or_vi, mortality_or_vi_std, 'lognormal'),
         }
 
         # SCREENING ACCURACY PARAMETERS (overall)
@@ -177,10 +196,17 @@ class GlaucomaParameters:
             'tn_severe': 0.91, 'tn_severe_std': 0.02,
             'fp_severe': 0.09, 'fp_severe_std': 0.02,
             'fn_severe': 0.02, 'fn_severe_std': 0.01,
-            'detection_proportion': 0.90, 'detection_std': 0.05,
+            'detection_proportion': 1.00, 'detection_std': 0.01,
             # AI screening costs
-            'ai_screening_cost': 11.5, 'ai_screening_cost_std': 3, ## AI screening costs include
-            'human_screening_cost': 100, 'human_screening_cost_std': 12,
+            'ai_screening_cost': 11.65, 'ai_screening_cost_std': 3,
+            'human_screening_cost': 215, 'human_screening_cost_std': 12,
+            # Mortality odds ratios (example values - adjust as needed)
+            'mortality_or_mild': 1.8, 'mortality_or_mild_std': 0.1,
+            'mortality_or_moderate': 1.8, 'mortality_or_moderate_std': 0.1,
+            'mortality_or_severe': 1.8, 'mortality_or_severe_std': 0.1,
+            'mortality_or_vi': 3.9, 'mortality_or_vi_std': 0.1,
+            # False positive disutility
+            'disutility_false_positive': 0.02, 'disutility_fp_std': 0.005,
         }
         defaults.update(kwargs)
         return cls(**defaults)
@@ -210,10 +236,17 @@ class GlaucomaParameters:
             'tn_severe': 0.78, 'tn_severe_std': 0.07,
             'fp_severe': 0.22, 'fp_severe_std': 0.07,
             'fn_severe': 0.12, 'fn_severe_std': 0.05,
-            'detection_proportion': 0.70, 'detection_std': 0.10,
+            'detection_proportion': 1.0, 'detection_std': 0.00,
             # Human screening costs (higher due to specialist time)
             'ai_screening_cost': 0.01, 'ai_screening_cost_std': 0.0001,
             'human_screening_cost': 0.01, 'human_screening_cost_std': 0.0000001,
+            # Mortality odds ratios (same as AI scenario)
+            'mortality_or_mild': 1.8, 'mortality_or_mild_std': 0.1,
+            'mortality_or_moderate': 1.8, 'mortality_or_moderate_std': 0.1,
+            'mortality_or_severe': 1.8, 'mortality_or_severe_std': 0.1,
+            'mortality_or_vi': 3.9, 'mortality_or_vi_std': 0.1,
+            # False positive disutility
+            'disutility_false_positive': 0.02, 'disutility_fp_std': 0.005,
         }
         defaults.update(kwargs)
         instance = cls(**defaults)
@@ -256,7 +289,7 @@ class GlaucomaParameters:
         for category in [self.costs, self.utilities, self.transitions,
                         self.screening_accuracy, self.screening_accuracy_mild,
                         self.screening_accuracy_moderate, self.screening_accuracy_severe,
-                        self.screening_params, self.discount_rates]:
+                        self.screening_params, self.discount_rates, self.mortality_odds_ratios]:
             for name, param in category.items():
                 sample[name] = param.sample(1)[0]
         return sample
@@ -272,7 +305,8 @@ class GlaucomaParameters:
                                        ('Screening_Accuracy_Moderate', self.screening_accuracy_moderate),
                                        ('Screening_Accuracy_Severe', self.screening_accuracy_severe),
                                        ('Screening_Params', self.screening_params),
-                                       ('Discount_Rates', self.discount_rates)]:
+                                       ('Discount_Rates', self.discount_rates),
+                                       ('Mortality_Odds_Ratios', self.mortality_odds_ratios)]:
             for name, param in category.items():
                 data.append({
                     'Category': category_name,
@@ -283,14 +317,12 @@ class GlaucomaParameters:
                 })
         return pd.DataFrame(data)
 
-    def get_screening_cost(self, screening_type='combined'):
+    def get_screening_cost(self, screening_type='ai_screening'):
         """Get screening cost based on type"""
         if screening_type == 'ai_only':
             return self.costs['ai_screening']
         elif screening_type == 'human_only':
             return self.costs['human_screening']
-        elif screening_type == 'combined':
-            return self.costs['screening']
         else:
             raise ValueError(f"Unknown screening type: {screening_type}. Use 'ai_only', 'human_only', or 'combined'")
 
@@ -305,4 +337,17 @@ class GlaucomaParameters:
         else:
             raise ValueError(f"Unknown state: {state}. Use 'mild', 'moderate', or 'severe'")
 
-print("Enhanced GlaucomaParameters class defined with state-specific screening accuracy!")
+    def get_mortality_odds_ratio(self, state):
+        """Get mortality odds ratio for a specific glaucoma state"""
+        state_map = {
+            'mild': 'mortality_or_mild',
+            'moderate': 'mortality_or_moderate',
+            'severe': 'mortality_or_severe',
+            'vi': 'mortality_or_vi'
+        }
+        if state in state_map:
+            return self.mortality_odds_ratios[state_map[state]]
+        else:
+            raise ValueError(f"Unknown state: {state}. Use 'mild', 'moderate', 'severe', or 'vi'")
+
+print("Enhanced GlaucomaParameters class defined with state-specific screening accuracy, mortality odds ratios, and false positive disutility!")
