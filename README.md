@@ -22,18 +22,10 @@ This model simulates the progression of glaucoma through four disease states (Mi
 ```
 glaucoma-health-economic-model/
 │
-├── src/                          # Source code directory
-│   └── data/                     # Data files and datasets
-│
-├── glaucoma_model/              # Core model package
-│   ├── __init__.py              # Package initialization
-│   ├── analysis.py              # Analysis functions and utilities
-│   ├── model.py                 # Core Markov model implementation
-│   ├── parameters.py            # Model parameters (costs, utilities, transitions)
-│   └── utils.py                 # Helper functions and utilities
-│
 ├── notebooks/                    # Jupyter notebooks for analysis
+│   ├── 01_model_setup_Portugal_costs.ipynb
 │   ├── 01_model_setup_restructured.ipynb
+│   ├── 01a_model_setup_Portugal_costs_utilities.ipynb
 │   ├── 02_prevalence_sensitivity_rerun.ipynb
 │   ├── 03_productivity_sensitivity_analysis.ipynb
 │   ├── 04_starting_age_sensitivity_analysis.ipynb
@@ -42,6 +34,16 @@ glaucoma-health-economic-model/
 │   ├── 07_screening_frequency_sensitivity_analysis.ipynb
 │   ├── 08_max_ai_cost_by_prevalence_optimized.ipynb
 │   └── Mortality_loader.ipynb
+│
+├── src/                          # Source code directory
+│   └── glaucoma_model/          # Core model package
+│       ├── __pycache__/         # Python cache files
+│       ├── __init__.py          # Package initialization
+│       ├── analysis.py          # Analysis functions and utilities
+│       ├── model.py             # Core Markov model implementation
+│       ├── parameters.py        # Model parameters (costs, utilities, transitions)
+│       ├── utils.py             # Helper functions and utilities
+│       └── Mortality_loader.ipynb
 │
 └── README.md                     # This file
 ```
@@ -55,6 +57,14 @@ glaucoma-health-economic-model/
 - Transition probability matrices for AI and non-AI strategies
 - Cost parameters and health utility values
 - Deterministic and probabilistic sensitivity analysis framework
+
+**01_model_setup_Portugal_costs.ipynb** - Portuguese cost parameters variant
+- Model setup with Portugal-specific cost data
+- Country-specific healthcare cost estimates
+
+**01a_model_setup_Portugal_costs_utilities.ipynb** - Extended Portuguese model
+- Portuguese cost parameters with additional utility value considerations
+- Comprehensive quality of life adjustments for Portuguese context
 
 ### Sensitivity Analyses
 
@@ -76,11 +86,11 @@ glaucoma-health-economic-model/
 
 ### Recommended Workflow
 
-**For New Users**: Start with notebook 01 to understand the base model, then explore sensitivity analyses (02-07)
+**For New Users**: Start with notebook 01_model_setup_restructured to understand the base model, then explore sensitivity analyses (02-07)
 
-**For Researchers**: Review Mortality_loader.ipynb for data sources, examine notebook 01 for model structure, then run relevant sensitivity analyses
+**For Researchers**: Review Mortality_loader.ipynb for data sources, examine notebook 01_model_setup_restructured for model structure, then run relevant sensitivity analyses
 
-**For Policymakers**: Focus on notebooks 01, 02, 04, and 05 for decision-relevant parameters
+**For Policymakers**: Focus on notebooks 01_model_setup_restructured, 02, 04, and 05 for decision-relevant parameters. Country-specific versions (01_Portugal_costs and 01a_Portugal_costs_utilities) provide localized economic analysis.
 
 ## Model Structure
 
