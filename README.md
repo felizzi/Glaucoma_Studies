@@ -118,9 +118,6 @@ glaucoma-health-economic-model/
 | Severe | €644 | €609 | €0 |
 | VI | €576 | €662 | €7,630 |
 
-### Screening Costs
-- **AI Screening**: $11.50 per patient
-- **Traditional Screening**: $100.00 per patient
 
 ### Health Utilities (0-1 scale)
 - **Mild**: 0.985 ± 0.023
