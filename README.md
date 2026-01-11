@@ -76,7 +76,7 @@ glaucoma-health-economic-model/
 
 **05_ai_cost_sensitivity_analysis.ipynb** - Robustness testing for AI screening cost variations
 
-**06_fp_disutility_sensitivity_analysis.ipynb** - False positive rates and quality of life impacts
+**06_fp_disutility_sensitivity_analysis_updated.ipynb** - False positive rates and quality of life impacts
 
 **07_screening_frequency_sensitivity_analysis.ipynb** - Comparison of different screening interval strategies
 
