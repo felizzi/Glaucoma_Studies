@@ -125,6 +125,12 @@ glaucoma-health-economic-model/
 - **Severe**: 0.773 ± 0.046
 - **VI**: 0.634 ± 0.052
 
+### Diagnostic Accuracy Parameters
+
+The model uses **sensitivity** and **specificity** values from the Parameter class to characterize screening performance for both AI and non-AI strategies. 
+
+**Important Note**: True Positives (TP), False Positives (FP), True Negatives (TN), and False Negatives (FN) are **not used** in the analysis. All diagnostic accuracy calculations are derived solely from the sensitivity and specificity parameters.
+
 ## Installation
 
 ### Requirements
